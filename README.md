@@ -249,6 +249,6 @@ Route::post('/profile/delete', [ProfileController::class, 'destroy'])->name('pro
 @endif
 
 
-9. The picture in the profile cannot be seen
+10. The picture in the profile cannot be seen
 - so what i did run command  to create the symbolic link between (public/storage) and (storage/app/public):
 php artisan storage:link
