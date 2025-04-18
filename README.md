@@ -1,66 +1,254 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+Login N Register Validation
+1. Create Form Req Classes
+- command :
+php artisan make:request RegisterRequest
+php artisan make:request LoginRequest
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+2. Add Validation Rules with Regex
+(app/Http/Requests/RegisterRequest.php)
+- add these codes :
+public function rules(): array
+{
+    return [
+        'name' => ['required', 'regex:/^[A-Za-z ]+$/'],
+        'email' => ['required', 'email'],
+        'password' => ['required', 'min:6', 'confirmed'], // 'confirmed' looks for password_confirmation field
+    ];
+}
 
-## About Laravel
+(app/Http/Requests/LoginRequest.php)
+- add these codes :
+public function rules(): array
+{
+    return [
+        'email' => ['required', 'email'],
+        'password' => ['required'],
+    ];
+}
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+3. Update the Controllers to use these request
+(app/Http/Controllers/Auth/RegisterController.php)
+- import the RegisterRequest class at the top of the controller :
+use App\Http\Requests\RegisterRequest;
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- also need to update the register() method in order to accept RegisterRequestpublic function register(RegisterRequest : $request)
+{
+    // Handle registration logic
+    $user = $this->create($request->validated());
+    
+    // Log the user in after registration
+    $this->guard()->login($user);
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+    return redirect($this->redirectPath());
+}
 
-## Learning Laravel
+(app/Http/Controllers/Auth/LoginController.php)
+- import the LoginRequest class at the top of the controller :
+use App\Http\Requests\LoginRequest;
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- update the login() method to accept the LoginRequest :
+public function login(LoginRequest $request)
+{
+    $credentials = $request->only('email', 'password');
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+    if (Auth::attempt($credentials)) {
+        return redirect()->intended($this->redirectTo);
+    }
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+    return back()->withErrors([
+        'email' => 'The provided credentials do not match our records.',
+    ])->withInput();
+}
 
-## Laravel Sponsors
+4. Update Blade Views to Display Errors - only for register cause login got already
+(register.blade.php):
+<!-- Name Field -->
+<input type="text" name="name" class="form-control" value="{{ old('name') }}" required>
+@error('name')
+    <div class="text-danger">{{ $message }}</div>
+@enderror
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+<!-- Email Field -->
+<input type="email" name="email" class="form-control" value="{{ old('email') }}" required>
+@error('email')
+    <div class="text-danger">{{ $message }}</div>
+@enderror
 
-### Premium Partners
+<!-- Password Field -->
+<input type="password" name="password" class="form-control" required>
+@error('password')
+    <div class="text-danger">{{ $message }}</div>
+@enderror
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+Profile Page
+1. Update the Database which is the users table:
+php artisan make:migration add_profile_fields_to_users_table --table=users
 
-## Contributing
+- then add these code in (database/migrations/..._add_profile_fields_to_users_table.php):
+public function up()
+{
+    Schema::table('users', function (Blueprint $table) {
+        $table->string('nickname')->nullable();
+        $table->string('avatar')->nullable();
+        $table->string('phone')->nullable();
+        $table->string('city')->nullable();
+    });
+}
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+public function down()
+{
+    Schema::table('users', function (Blueprint $table) {
+        $table->dropColumn(['nickname', 'avatar', 'phone', 'city']);
+    });
+}
 
-## Code of Conduct
+- then run this command:
+php artisan migrate
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+2. Update the user model
+(app/Models/User.php), add new fields in the $fillable array:
+protected $fillable = [
+    'name',
+    'nickname',
+    'email',
+    'password',
+    'avatar',
+    'phone',
+    'city',
+];
 
-## Security Vulnerabilities
+3. Create Profile Controller & Route
+php artisan make:controller ProfileController
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- then add the routes in (routes/web.php):
+Route::middleware(['auth'])->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/delete', [ProfileController::class, 'destroy'])->name('profile.delete');
+});
 
-## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+4. Build the Profile Form
+- Create (resources/views/profile.blade.php) with fields like these:
+<form method="POST" action="{{ route('profile.update') }}" enctype="multipart/form-data">
+    @csrf
+
+    <!-- Nickname -->
+    <input type="text" name="nickname" value="{{ old('nickname', auth()->user()->nickname) }}" required>
+
+    <!-- Email -->
+    <input type="email" name="email" value="{{ old('email', auth()->user()->email) }}" required>
+
+    <!-- Password -->
+    <input type="password" name="password" placeholder="New Password (optional)">
+
+    <!-- Phone -->
+    <input type="text" name="phone" value="{{ old('phone', auth()->user()->phone) }}">
+
+    <!-- City -->
+    <input type="text" name="city" value="{{ old('city', auth()->user()->city) }}">
+
+    <!-- Avatar -->
+    <input type="file" name="avatar">
+
+    <button type="submit">Update Profile</button>
+</form>
+
+<form method="POST" action="{{ route('profile.delete') }}">
+    @csrf
+    <button type="submit" onclick="return confirm('Are you sure you want to delete your account?')">Delete Account</button>
+</form>
+
+
+5. Add Logic in ProfileController
+- in the (ProfileController.php) add these:
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+
+public function edit()
+{
+    return view('profile');
+}
+
+public function update(Request $request)
+{
+    $user = auth()->user();
+
+    $data = $request->validate([
+        'nickname' => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email,' . $user->id,
+        'password' => 'nullable|min:8',
+        'phone' => 'nullable|string',
+        'city' => 'nullable|string',
+        'avatar' => 'nullable|image|max:2048',
+    ]);
+
+    if ($request->hasFile('avatar')) {
+        $avatarPath = $request->file('avatar')->store('avatars', 'public');
+        $data['avatar'] = $avatarPath;
+    }
+
+    if (!empty($data['password'])) {
+        $data['password'] = Hash::make($data['password']);
+    } else {
+        unset($data['password']);
+    }
+
+    $user->update($data);
+
+    return redirect()->back()->with('success', 'Profile updated successfully!');
+}
+
+public function destroy()
+{
+    $user = auth()->user();
+    $user->delete();
+
+    return redirect('/')->with('message', 'Account deleted');
+}
+
+
+6. Got error 
+- it says that the Class "App\Http\Controllers\Auth\Auth" not found
+- so now we need to fix it...
+- i go to my (LoginController.php) add this import line:
+use Illuminate\Support\Facades\Auth;
+
+so it should look like this,
+<?php
+
+namespace App\Http\Controllers\Auth;
+
+use App\Http\Requests\LoginRequest;
+use App\Http\Controllers\Controller;
+use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Support\Facades\Auth; // ✅ THIS LINE IS MISSING
+
+
+7. Show success message in (resources/views/profile.blade.php)
+- since in my ProfileController@update already redirects back with a session message:
+return redirect()->back()->with('success', 'Profile updated successfully!');
+- now i just need to display in profile.blade.php:
+@if (session('success'))
+    <div class="alert alert-success">
+        {{ session('success') }}
+    </div>
+@endif
+
+8. The profile page didn't appear
+- this is because i did not define the delete page properly:
+Route::post('/profile/delete', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+9. The profile picture didn't appear at the top of the page (profile.blade.php)
+- so what i did is add new line after <div class="container">:
+@if (auth()->user()->avatar)
+    <div class="text-center mb-4">
+        <img src="{{ asset('storage/' . auth()->user()->avatar) }}" alt="Avatar" class="rounded-circle shadow" width="150" height="150">
+        <h4 class="mt-2">{{ auth()->user()->nickname }}</h4>
+    </div>
+@endif
+
+
+9. The picture in the profile cannot be seen
+- so what i did run command  to create the symbolic link between (public/storage) and (storage/app/public):
+php artisan storage:link
